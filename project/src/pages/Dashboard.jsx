@@ -2,6 +2,11 @@ import React, { useState } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import BottomNav from "../components/BottomNav";
+import PrescriptionManager from "./PrescriptionManager";
+import DoctorDashboard from "./DoctorDashboard";
+import DoctorReminders from "./DoctorReminders";
+
+
 
 export default function Dashboard({ user }) {
   const [page, setPage] = useState("dashboard");
@@ -10,9 +15,10 @@ export default function Dashboard({ user }) {
     <div style={{ height: "100vh", paddingBottom: "70px" }}>
       {/* MAIN CONTENT */}
       <div style={{ padding: "20px" }}>
-        {page === "dashboard" && <h2>Dashboard</h2>}
-        {page === "prescriptions" && <h2>Prescriptions Page</h2>}
-        {page === "reminders" && <h2>Reminders Page</h2>}
+        {page === "dashboard" && <DoctorDashboard />}
+        {page === "prescriptions" && <PrescriptionManager />}
+        {page === "reminders" && <DoctorReminders />}
+
         {page === "profile" && (
           <div>
             <h2>Profile</h2>

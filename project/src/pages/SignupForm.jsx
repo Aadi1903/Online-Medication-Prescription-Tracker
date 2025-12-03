@@ -83,7 +83,7 @@ export default function SignupForm({ switchToLogin }) {
 
       <input name="fullName" onChange={onChange} className="input" placeholder="Full Name" required />
       <input name="email" onChange={onChange} type="email" className="input" placeholder="Email" required />
-      <input name="password" onChange={onChange} type="password" className="input" placeholder="Password" required />
+      <input name="password" onChange={onChange} type="password" className="input" placeholder="Password" minLength={6} required />
 
       <select className="input" value={role} onChange={(e) => setRole(e.target.value)} required>
         <option value="">Role</option>
