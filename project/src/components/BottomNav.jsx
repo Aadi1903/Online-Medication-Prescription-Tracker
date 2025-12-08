@@ -3,10 +3,10 @@ import { LayoutDashboard, FileHeart, AlarmClock, User, Home } from "lucide-react
 
 export default function BottomNav({ current, setCurrent }) {
   const items = [
-    { id: "dashboard", label: "Dashboard", icon: <Home size={22} /> },
-    { id: "prescriptions", label: "Prescriptions", icon: <FileHeart size={22} /> },
-    { id: "reminders", label: "Reminders", icon: <AlarmClock size={22} /> },
-    { id: "profile", label: "Profile", icon: <User size={22} /> },
+    { id: "dashboard", label: "Dashboard", icon: <Home size={18} /> },
+    { id: "prescriptions", label: "Prescriptions", icon: <FileHeart size={18} /> },
+    { id: "reminders", label: "Reminders", icon: <AlarmClock size={18} /> },
+    { id: "profile", label: "Profile", icon: <User size={18} /> },
   ];
 
   return (
@@ -26,7 +26,7 @@ export default function BottomNav({ current, setCurrent }) {
           >
             <div style={styles.inner}>
               {item.icon}
-              <span style={{ fontSize: "12px" }}>{item.label}</span>
+              <span style={{ fontSize: "10px" }}>{item.label}</span>
             </div>
           </button>
         );
@@ -38,13 +38,13 @@ export default function BottomNav({ current, setCurrent }) {
 const styles = {
   nav: {
     position: "fixed",
-    bottom: 20,
+    bottom: "10px",
     left: "50%",
     transform: "translateX(-50%)",
     width: "60%",
     display: "flex",
     justifyContent: "space-around",
-    padding: "14px 0",
+    padding: "0px 0",
     background: "#0d0d0d",
     borderRadius: "20px",
     border: "1px solid #222",
@@ -56,7 +56,7 @@ const styles = {
     borderRadius: "12px",
     border: "none",
     cursor: "pointer",
-    fontSize: "20px",
+    fontSize: "6px",
     background: "transparent",
     color: "#fff",
   },

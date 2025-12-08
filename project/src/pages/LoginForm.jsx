@@ -1,18 +1,18 @@
 import React, { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "../firebase";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
-export default function LoginForm({ switchToSignup }) {
+export default function LoginForm({ switchToSignup, showToast }) {
   const [form, setForm] = useState({ email: "", password: "" });
 
   async function submit(e) {
     e.preventDefault();
     try {
       await signInWithEmailAndPassword(auth, form.email, form.password);
+      showToast("Logged in successfully!", "success");
     } catch (err) {
       console.error(err);
-      alert(err.message || "Login failed");
+      showToast(err.message || "Login failed", "error");
     }
   }
 
@@ -20,9 +20,10 @@ export default function LoginForm({ switchToSignup }) {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
+      showToast("Google sign-in successful!", "success");
     } catch (err) {
       console.error(err);
-      alert("Google Sign-in failed");
+      showToast("Google sign-in failed", "error");
     }
   }
 
@@ -47,7 +48,7 @@ export default function LoginForm({ switchToSignup }) {
 
       <button className="btn" type="submit">Log In</button>
 
-      {/* GOOGLE BUTTON HERE */}
+      {/* GOOGLE LOGIN */}
       <button type="button" className="gbtn" onClick={googleLogin}>
         <img
           src="https://www.svgrepo.com/show/475656/google-color.svg"
