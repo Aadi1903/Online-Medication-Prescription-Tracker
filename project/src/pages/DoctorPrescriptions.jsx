@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { db, auth, storage } from "../firebase";
+import { db, auth } from "../firebase";
 import {
   addDoc,
   updateDoc,
@@ -9,19 +9,43 @@ import {
   where,
   onSnapshot,
   serverTimestamp,
+  getDocs,
+  getDoc
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function DoctorPrescriptions() {
-  const [patientId, setPatientId] = useState("");
+  const [patientName, setPatientName] = useState("");
+  const [patientEmail, setPatientEmail] = useState("");
   const [medicines, setMedicines] = useState([
     { name: "", dosage: "", duration: "", instructions: "" }
   ]);
-  const [pdfFile, setPdfFile] = useState(null);
   const [prescriptions, setPrescriptions] = useState([]);
   const [editingId, setEditingId] = useState(null);
 
-  // Fetch previous prescriptions for doctor
+  // ✅ AUTO-FILL EMAIL FROM PATIENT NAME
+  useEffect(() => {
+    const fetchEmail = async () => {
+      if (!patientName) return;
+
+      const q = query(
+        collection(db, "users"),
+        where("name", "==", patientName),
+        where("role", "==", "patient")
+      );
+
+      const snap = await getDocs(q);
+
+      if (!snap.empty) {
+        setPatientEmail(snap.docs[0].data().email);
+      } else {
+        setPatientEmail("");
+      }
+    };
+
+    fetchEmail();
+  }, [patientName]);
+
+  // ✅ FETCH DOCTOR PRESCRIPTIONS
   useEffect(() => {
     const doctorId = auth.currentUser.uid;
 
@@ -30,18 +54,38 @@ export default function DoctorPrescriptions() {
       where("doctorId", "==", doctorId)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const list = await Promise.all(
+        snapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data();
+
+          // ✅ FIX OLD RECORDS: BACK-FILL NAME IF MISSING
+          if (!data.patientName && data.patientEmail) {
+            const uq = query(
+              collection(db, "users"),
+              where("email", "==", data.patientEmail)
+            );
+            const usnap = await getDocs(uq);
+
+            if (!usnap.empty) {
+              data.patientName = usnap.docs[0].data().name;
+
+              await updateDoc(doc(db, "prescriptions", docSnap.id), {
+                patientName: data.patientName
+              });
+            }
+          }
+
+          return { id: docSnap.id, ...data };
+        })
+      );
+
       setPrescriptions(list);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Update medicine fields
   const updateMedicine = (index, field, value) => {
     const updated = [...medicines];
     updated[index][field] = value;
@@ -55,37 +99,36 @@ export default function DoctorPrescriptions() {
     ]);
   };
 
-  // Submit or update prescription
   const handleSubmit = async () => {
     try {
-      const doctorId = auth.currentUser.uid;
-      let pdfUrl = null;
-
-      if (pdfFile) {
-        const fileRef = ref(storage, `prescriptions/${Date.now()}_${pdfFile.name}`);
-        await uploadBytes(fileRef, pdfFile);
-        pdfUrl = await getDownloadURL(fileRef);
+      if (!patientName || !patientEmail) {
+        alert("Enter valid patient name & email!");
+        return;
       }
 
+      const doctorId = auth.currentUser.uid;
+
+      const doctorSnap = await getDoc(doc(db, "users", doctorId));
+      const doctorData = doctorSnap.data();
+
       if (editingId) {
-        // Update old prescription
-        const refDoc = doc(db, "prescriptions", editingId);
-        await updateDoc(refDoc, {
-          patientId,
+        await updateDoc(doc(db, "prescriptions", editingId), {
+          patientName,
+          patientEmail,
           medicines,
-          ...(pdfUrl && { pdfUrl }),
           updatedAt: serverTimestamp(),
         });
 
         alert("Prescription updated!");
         setEditingId(null);
       } else {
-        // New prescription
         await addDoc(collection(db, "prescriptions"), {
           doctorId,
-          patientId,
+          doctorName: doctorData?.fullName || "",
+          specialization: doctorData?.specialization || "",
+          patientName,
+          patientEmail,
           medicines,
-          pdfUrl,
           status: "pending",
           createdAt: serverTimestamp(),
         });
@@ -93,10 +136,9 @@ export default function DoctorPrescriptions() {
         alert("Prescription added!");
       }
 
-      // Reset
-      setPatientId("");
+      setPatientName("");
+      setPatientEmail("");
       setMedicines([{ name: "", dosage: "", duration: "", instructions: "" }]);
-      setPdfFile(null);
 
     } catch (err) {
       console.error(err);
@@ -104,26 +146,35 @@ export default function DoctorPrescriptions() {
     }
   };
 
-  // Load prescription in form for editing
   const handleEdit = (p) => {
     setEditingId(p.id);
-    setPatientId(p.patientId);
+    setPatientName(p.patientName || "");
+    setPatientEmail(p.patientEmail || "");
     setMedicines(p.medicines);
   };
 
   return (
     <div style={{ display: "flex", height: "100vh", color: "white" }}>
       
-{/* LEFT SIDE — ADD/UPDATE FORM */}
 <div style={{ width: "45%", padding: 20, borderRight: "1px solid #222" }} className="hide-scrollbar">
   
   <h2>{editingId ? "Update Prescription" : "Add Prescription"}</h2>
 
+  {/* ✅ PATIENT NAME */}
   <input
     className="input"
-    placeholder="Patient UID"
-    value={patientId}
-    onChange={(e) => setPatientId(e.target.value)}
+    placeholder="Patient Name"
+    value={patientName}
+    onChange={(e) => setPatientName(e.target.value)}
+  />
+
+  {/* ✅ EMAIL STRICTLY BELOW NAME (AUTO-FILLED) */}
+  <input
+    className="input"
+    placeholder="Patient Email"
+    value={patientEmail}
+    onChange={(e) => setPatientEmail(e.target.value)}
+    style={{ marginTop: 10 }}
   />
 
   <h3>Medicines</h3>
@@ -136,21 +187,18 @@ export default function DoctorPrescriptions() {
         value={m.name}
         onChange={(e) => updateMedicine(index, "name", e.target.value)}
       />
-
       <input
         className="input"
         placeholder="Dosage"
         value={m.dosage}
         onChange={(e) => updateMedicine(index, "dosage", e.target.value)}
       />
-
       <input
         className="input"
         placeholder="Duration"
         value={m.duration}
         onChange={(e) => updateMedicine(index, "duration", e.target.value)}
       />
-
       <input
         className="input"
         placeholder="Instructions"
@@ -160,7 +208,6 @@ export default function DoctorPrescriptions() {
     </div>
   ))}
 
-  {/* ✅ BUTTON SECTION WITH PROPER SPACING */}
   <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 20 }}>
     <button className="btn" onClick={addMedicineField}>
       + Add Medicine
@@ -170,12 +217,9 @@ export default function DoctorPrescriptions() {
       {editingId ? "Update Prescription" : "Submit Prescription"}
     </button>
   </div>
+</div>
 
-</div>   {/* ✅ VERY IMPORTANT: THIS LINE CLOSES THE LEFT SIDE */}
-
-
-
-      {/* RIGHT SIDE — Prescription List */}
+      {/* ✅ RIGHT SIDE */}
       <div style={{ width: "55%", padding: 20 }} className="hide-scrollbar">
         <h2>Your Prescriptions</h2>
 
@@ -188,10 +232,11 @@ export default function DoctorPrescriptions() {
               borderRadius: 12,
               padding: 15,
               border: "1px solid #222",
-              
             }}
           >
-            <p><strong>Patient:</strong> {p.patientId}</p>
+            <p><strong>Patient:</strong> {p.patientName}</p>
+            <p><strong>Email:</strong> {p.patientEmail}</p>
+
             <p><strong>Status:</strong> {p.status}</p>
 
             <p><strong>Medicines:</strong></p>
@@ -201,16 +246,9 @@ export default function DoctorPrescriptions() {
               ))}
             </ul>
 
-            {p.pdfUrl && (
-              <a href={p.pdfUrl} target="_blank" rel="noreferrer" style={{ color: "#00D675" }}>
-                View PDF
-              </a>
-            )}
-
             <button className="btn" style={{ marginTop: 10 }} onClick={() => handleEdit(p)}>
               ✏️ Edit
             </button>
-
           </div>
         ))}
       </div>

@@ -12,15 +12,41 @@ export default function AdminPrescriptions() {
     const userSnap = await getDocs(collection(db, "users"));
 
     const doctors = {};
+    const patientsByEmail = {};
+    const patientsByUid = {};
+
     userSnap.forEach((u) => {
-      if (u.data().role === "doctor") doctors[u.id] = u.data();
+      const data = u.data();
+
+      if (data.role === "doctor") {
+        doctors[u.id] = data;
+      }
+
+      if (data.role === "patient") {
+        if (data.email) patientsByEmail[data.email] = data;
+        patientsByUid[u.id] = data;
+      }
     });
 
     const all = presSnap.docs.map((p) => {
       const data = p.data();
+
+      // ✅ FIND PATIENT USING EMAIL FIRST (NEW SYSTEM), FALLBACK TO UID (OLD SYSTEM)
+      const patientFromEmail = patientsByEmail[data.patientEmail];
+      const patientFromUid = patientsByUid[data.patientId];
+
+      const patientData = patientFromEmail || patientFromUid || {};
+
       return {
         id: p.id,
         ...data,
+
+        // ✅ ATTACHED PATIENT DETAILS
+        patientName: data.patientName || patientData.name || "Not Available",
+        patientEmail: data.patientEmail || patientData.email || "Not Available",
+        age: patientData.age || "Not Available",
+
+        // ✅ ATTACHED DOCTOR DETAILS
         doctorDetails: doctors[data.doctorId] || {},
       };
     });
@@ -45,7 +71,8 @@ export default function AdminPrescriptions() {
     const searchLower = search.toLowerCase();
 
     const matchesSearch =
-      item.patientId?.toLowerCase().includes(searchLower) ||
+      item.patientName?.toLowerCase().includes(searchLower) ||
+      item.patientEmail?.toLowerCase().includes(searchLower) ||
       item.doctorDetails?.fullName?.toLowerCase().includes(searchLower) ||
       item.doctorDetails?.email?.toLowerCase().includes(searchLower) ||
       item.medicines?.some((m) => m.name?.toLowerCase().includes(searchLower));
@@ -55,7 +82,6 @@ export default function AdminPrescriptions() {
 
   return (
     <>
-      {/* ✅ SCROLLBAR HIDE CSS INSIDE SAME FILE */}
       <style>
         {`
           .hide-scrollbar::-webkit-scrollbar {
@@ -144,8 +170,11 @@ export default function AdminPrescriptions() {
             >
               <div style={{ width: "48%" }}>
                 <h3>Patient Details</h3>
-                <p><strong>Patient ID:</strong> {item.patientId}</p>
-                <p><strong>Age:</strong> {item.age || "Not Available"}</p>
+
+                {/* ✅ REQUIRED ORDER */}
+                <p><strong>Patient Name:</strong> {item.patientName}</p>
+                <p><strong>Email:</strong> {item.patientEmail}</p>
+                <p><strong>Age:</strong> {item.age}</p>
 
                 <p>
                   <strong>Date:</strong>{" "}
@@ -212,7 +241,6 @@ export default function AdminPrescriptions() {
       borderRadius: "8px",
       fontSize: "16px",
       display: "inline-block",
-      // fontWeight: "bold",
     }}
   >
     Approved
