@@ -5,27 +5,63 @@ import { auth } from "../firebase";
 export default function LoginForm({ switchToSignup, showToast }) {
   const [form, setForm] = useState({ email: "", password: "" });
 
-  async function submit(e) {
-    e.preventDefault();
-    try {
-      await signInWithEmailAndPassword(auth, form.email, form.password);
-      showToast("Logged in successfully!", "success");
-    } catch (err) {
-      console.error(err);
-      showToast(err.message || "Login failed", "error");
-    }
-  }
+  // async function submit(e) {
+  //   e.preventDefault();
+  //   try {
+  //     await signInWithEmailAndPassword(auth, form.email, form.password);
+  //     showToast("Logged in successfully!", "success");
+  //   } catch (err) {
+  //     console.error(err);
+  //     showToast(err.message || "Login failed", "error");
+  //   }
+  // }
 
-  async function googleLogin() {
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      showToast("Google sign-in successful!", "success");
-    } catch (err) {
-      console.error(err);
-      showToast("Google sign-in failed", "error");
-    }
+  // async function googleLogin() {
+  //   try {
+  //     const provider = new GoogleAuthProvider();
+  //     await signInWithPopup(auth, provider);
+  //     showToast("Google sign-in successful!", "success");
+  //   } catch (err) {
+  //     console.error(err);
+  //     showToast("Google sign-in failed", "error");
+  //   }
+  // }
+
+  async function submit(e) {
+  e.preventDefault();
+  try {
+    await signInWithEmailAndPassword(auth, form.email, form.password);
+
+    showToast("Logged in successfully!", "success");
+
+  } catch (err) {
+    console.error(err);
+
+    const msg =
+      err.code === "auth/user-not-found"
+        ? "User not found"
+        : err.code === "auth/wrong-password"
+        ? "Invalid password"
+        : "Login failed";
+
+    showToast(msg, "error");
   }
+}
+
+async function googleLogin() {
+  try {
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+
+    // ✅ THIS WILL SHOW AFTER GOOGLE POPUP CLOSES
+    showToast("Google sign-in successful!", "success");
+
+  } catch (err) {
+    console.error(err);
+    showToast("Google sign-in failed", "error");
+  }
+}
+
 
   return (
     <form className="card" onSubmit={submit}>

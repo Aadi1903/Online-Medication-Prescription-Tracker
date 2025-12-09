@@ -164,6 +164,14 @@ export default function SignupForm({ switchToLogin, showToast }) {
       )}
 
       <button className="btn" type="submit">Sign Up</button>
+      <p className="muted">
+  Have an account?{" "}
+  <button type="button" className="link" onClick={switchToLogin}>
+    Login
+  </button>
+</p>
+
     </form>
+    
   );
 }
