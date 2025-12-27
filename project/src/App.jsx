@@ -12,10 +12,14 @@ export default function App() {
   // Toast state
   const [toast, setToast] = useState(null);
 
+  // Toast timer ref
+  const toastTimer = React.useRef(null);
+
   // Toast function
   const showToast = (message, type = "info") => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ message, type });
-    setTimeout(() => setToast(null), 2000);
+    toastTimer.current = setTimeout(() => setToast(null), 4000);
   };
 
   useEffect(() => {

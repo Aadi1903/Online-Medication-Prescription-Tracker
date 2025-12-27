@@ -3,6 +3,7 @@ import { db, auth } from "../firebase";
 import {
   addDoc,
   updateDoc,
+  deleteDoc,
   collection,
   doc,
   query,
@@ -12,8 +13,9 @@ import {
   getDocs,
   getDoc
 } from "firebase/firestore";
+import { Trash2, Edit3, Plus } from "lucide-react";
 
-export default function DoctorPrescriptions() {
+export default function DoctorPrescriptions({ showToast }) {
   const [patientName, setPatientName] = useState("");
   const [patientEmail, setPatientEmail] = useState("");
   const [medicines, setMedicines] = useState([
@@ -22,10 +24,27 @@ export default function DoctorPrescriptions() {
   const [prescriptions, setPrescriptions] = useState([]);
   const [editingId, setEditingId] = useState(null);
 
-  // ✅ AUTO-FILL EMAIL FROM PATIENT NAME
+  // ✅ AUTO-FILL EMAIL FROM PATIENT NAME (SKIP IF EDITING)
   useEffect(() => {
+    // If we are editing an existing prescription, don't overwrite the email
+    // The editingId check isn't enough because handleEdit sets it, but this effect runs when patientName changes.
+    // However, if the user MANUALLY types a name, we want to fetch key. 
+    // Best logic: Only fetch if patientName changed and we are NOT in the middle of setting up an edit.
+    // Actually simpler: when handleEdit runs, it sets patientName, triggering this.
+    // We can add a simple check: if the fetched email is different and we just started editing, maybe we should be careful.
+    // BUT the user said "for emailid i have to click edit btn twice". This implies the effect resets it.
+
+    // Fix: We'll use a ref to track if the change was programmatic (from edit)
+    // For now, let's just allow the effect but make sure handleEdit sets state AFTER the effect would run?
+    // impossible.
+    // Better fix: check if the 'patientName' matches the 'editing' patient. 
+
     const fetchEmail = async () => {
+      // If we are editing, we trust the prescription's email initially. 
+      // User can change name, which might trigger new fetch.
+
       if (!patientName) return;
+      if (editingId) return; // ✅ CRITICAL FIX: Don't auto-fetch if in edit mode to avoid overwriting
 
       const q = query(
         collection(db, "users"),
@@ -43,11 +62,13 @@ export default function DoctorPrescriptions() {
     };
 
     fetchEmail();
-  }, [patientName]);
+  }, [patientName, editingId]);
 
   // ✅ FETCH DOCTOR PRESCRIPTIONS
   useEffect(() => {
-    const doctorId = auth.currentUser.uid;
+    const user = auth.currentUser;
+    if (!user) return;
+    const doctorId = user.uid;
 
     const q = query(
       collection(db, "prescriptions"),
@@ -99,19 +120,37 @@ export default function DoctorPrescriptions() {
     ]);
   };
 
+  const handleDelete = async (id) => {
+    if (window.confirm("Delete this prescription?")) {
+      try {
+        // ✅ CASCADED DELETE: Remove associated reminders
+        const q = query(collection(db, "reminders"), where("prescriptionId", "==", id));
+        const snap = await getDocs(q);
+        const deletePromises = snap.docs.map(d => deleteDoc(doc(db, "reminders", d.id)));
+        await Promise.all(deletePromises);
+
+        await deleteDoc(doc(db, "prescriptions", id));
+        if (showToast) showToast("Prescription and its history deleted!", "success");
+      } catch (err) {
+        console.error("Error deleting:", err);
+        if (showToast) showToast("Failed to delete fully", "error");
+      }
+    }
+  };
+
   const handleSubmit = async () => {
     try {
-      if (!patientName || !patientEmail) {
-        alert("Enter valid patient name & email!");
-        return;
-      }
+      if (!patientName || !patientEmail) return showToast("Fill all details!", "error");
 
       const doctorId = auth.currentUser.uid;
-
       const doctorSnap = await getDoc(doc(db, "users", doctorId));
       const doctorData = doctorSnap.data();
 
       if (editingId) {
+        // ✅ SYNC REMINDERS ON EDIT
+        const oldPrescSnap = await getDoc(doc(db, "prescriptions", editingId));
+        const oldData = oldPrescSnap.data();
+
         await updateDoc(doc(db, "prescriptions", editingId), {
           patientName,
           patientEmail,
@@ -119,7 +158,35 @@ export default function DoctorPrescriptions() {
           updatedAt: serverTimestamp(),
         });
 
-        alert("Prescription updated!");
+        // Fetch all existing reminders for this prescription
+        const remQ = query(collection(db, "reminders"), where("prescriptionId", "==", editingId));
+        const remSnap = await getDocs(remQ);
+
+        const updatePromises = remSnap.docs.map(async (remDoc) => {
+          const remData = remDoc.data();
+          const remRef = doc(db, "reminders", remDoc.id);
+
+          // 1. Check if patient info changed
+          const updates = {};
+          if (patientName !== oldData.patientName) updates.patientName = patientName;
+
+          // 2. Check if medicine was renamed or removed
+          const currentMedNames = medicines.map(m => m.name);
+          if (!currentMedNames.includes(remData.medicineName)) {
+            // Medicine removed or renamed. 
+            // If it was renamed, we could try to find the match, 
+            // but simpler/safer: if the name is not in current list, delete reminder history for that medicine
+            return deleteDoc(remRef);
+          }
+
+          if (Object.keys(updates).length > 0) {
+            return updateDoc(remRef, updates);
+          }
+        });
+
+        await Promise.all(updatePromises);
+
+        if (showToast) showToast("Prescription and reminders updated!", "success");
         setEditingId(null);
       } else {
         await addDoc(collection(db, "prescriptions"), {
@@ -132,17 +199,17 @@ export default function DoctorPrescriptions() {
           status: "pending",
           createdAt: serverTimestamp(),
         });
-
-        alert("Prescription added!");
+        if (showToast) showToast("Prescription created successfully!", "success");
       }
 
       setPatientName("");
       setPatientEmail("");
+      setEditingId(null); // Ensure edit mode is cleared
       setMedicines([{ name: "", dosage: "", duration: "", instructions: "" }]);
 
     } catch (err) {
       console.error(err);
-      alert("Error: " + err.message);
+      if (showToast) showToast(err.message, "error");
     }
   };
 
@@ -153,105 +220,196 @@ export default function DoctorPrescriptions() {
     setMedicines(p.medicines);
   };
 
+  const formatDate = (ts) => {
+    if (!ts) return "";
+    const d = ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
+    return d.toLocaleDateString();
+  };
+
   return (
-    <div style={{ display: "flex", height: "100vh", color: "white" }}>
-      
-<div style={{ width: "45%", padding: 20, borderRight: "1px solid #222" }} className="hide-scrollbar">
-  
-  <h2>{editingId ? "Update Prescription" : "Add Prescription"}</h2>
+    <div className="hide-scrollbar" style={{ display: "flex", gap: "30px", padding: "30px", height: "100vh", color: "white", overflow: "hidden" }}>
 
-  {/* ✅ PATIENT NAME */}
-  <input
-    className="input"
-    placeholder="Patient Name"
-    value={patientName}
-    onChange={(e) => setPatientName(e.target.value)}
-  />
+      {/* ──────── LEFT CARD: FORM ──────── */}
+      <div className="hide-scrollbar" style={{
+        flex: "0 0 40%",
+        background: "rgba(20, 20, 20, 0.6)",
+        backdropFilter: "blur(10px)",
+        borderRadius: "20px",
+        border: "1px solid rgba(255, 255, 255, 0.05)",
+        padding: "30px",
+        overflowY: "auto"
+      }}>
 
-  {/* ✅ EMAIL STRICTLY BELOW NAME (AUTO-FILLED) */}
-  <input
-    className="input"
-    placeholder="Patient Email"
-    value={patientEmail}
-    onChange={(e) => setPatientEmail(e.target.value)}
-    style={{ marginTop: 10 }}
-  />
+        <h2 style={{ fontSize: "1.8rem", margin: 0, color: "#fff" }}>
+          {editingId ? "Update Prescription" : "Create New"}
+        </h2>
+        <p style={{ margin: "5px 0 20px 0", color: "#aaa", fontSize: "0.9rem" }}>
+          Fill patient details and medicine info
+        </p>
 
-  <h3>Medicines</h3>
+        <div style={{ height: "1px", background: "rgba(255,255,255,0.1)", marginBottom: "20px" }}></div>
 
-  {medicines.map((m, index) => (
-    <div key={index} style={{ marginBottom: 10 }}>
-      <input
-        className="input"
-        placeholder="Name"
-        value={m.name}
-        onChange={(e) => updateMedicine(index, "name", e.target.value)}
-      />
-      <input
-        className="input"
-        placeholder="Dosage"
-        value={m.dosage}
-        onChange={(e) => updateMedicine(index, "dosage", e.target.value)}
-      />
-      <input
-        className="input"
-        placeholder="Duration"
-        value={m.duration}
-        onChange={(e) => updateMedicine(index, "duration", e.target.value)}
-      />
-      <input
-        className="input"
-        placeholder="Instructions"
-        value={m.instructions}
-        onChange={(e) => updateMedicine(index, "instructions", e.target.value)}
-      />
-    </div>
-  ))}
+        <h4 style={{ color: "#00D675", textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1px", marginBottom: "15px" }}>
+          Patient Info
+        </h4>
 
-  <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 20 }}>
-    <button className="btn" onClick={addMedicineField}>
-      + Add Medicine
-    </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+          <input
+            placeholder="Full Name"
+            value={patientName}
+            onChange={(e) => setPatientName(e.target.value)}
+            style={inputStyle}
+          />
+          <input
+            placeholder="Patient Email"
+            value={patientEmail}
+            onChange={(e) => setPatientEmail(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
 
-    <button className="btn" onClick={handleSubmit}>
-      {editingId ? "Update Prescription" : "Submit Prescription"}
-    </button>
-  </div>
-</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px", marginBottom: "15px" }}>
+          <h4 style={{ color: "#00D675", textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1px", margin: 0 }}>
+            Medicines
+          </h4>
+          <button onClick={addMedicineField} style={{ background: "none", border: "none", color: "#00D675", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px", fontSize: "0.85rem", fontWeight: "600" }}>
+            <Plus size={16} /> Add More
+          </button>
+        </div>
 
-      {/* ✅ RIGHT SIDE */}
-      <div style={{ width: "55%", padding: 20 }} className="hide-scrollbar">
-        <h2>Your Prescriptions</h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {medicines.map((m, i) => (
+            <div key={i} style={{ background: "rgba(255,255,255,0.03)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <input
+                placeholder="Medicine Name"
+                value={m.name}
+                onChange={(e) => updateMedicine(i, "name", e.target.value)}
+                style={{ ...inputStyle, marginBottom: "10px" }}
+              />
+              <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+                <input
+                  placeholder="Dosage"
+                  value={m.dosage}
+                  onChange={(e) => updateMedicine(i, "dosage", e.target.value)}
+                  style={inputStyle}
+                />
+                <input
+                  placeholder="Duration"
+                  value={m.duration}
+                  onChange={(e) => updateMedicine(i, "duration", e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <textarea
+                placeholder="Special Instruction"
+                value={m.instructions}
+                onChange={(e) => updateMedicine(i, "instructions", e.target.value)}
+                style={{ ...inputStyle, minHeight: "60px", resize: "vertical" }}
+              />
+            </div>
+          ))}
+        </div>
 
-        {prescriptions.map((p) => (
-          <div
-            key={p.id}
-            style={{
-              marginBottom: 12,
-              background: "#111",
-              borderRadius: 12,
-              padding: 15,
-              border: "1px solid #222",
-            }}
-          >
-            <p><strong>Patient:</strong> {p.patientName}</p>
-            <p><strong>Email:</strong> {p.patientEmail}</p>
+        <button onClick={handleSubmit} style={saveBtnStyle}>
+          {editingId ? "Update Prescription" : "Save Prescription"}
+        </button>
 
-            <p><strong>Status:</strong> {p.status}</p>
-
-            <p><strong>Medicines:</strong></p>
-            <ul>
-              {p.medicines.map((m, i) => (
-                <li key={i}>{m.name} — {m.dosage}</li>
-              ))}
-            </ul>
-
-            <button className="btn" style={{ marginTop: 10 }} onClick={() => handleEdit(p)}>
-              ✏️ Edit
-            </button>
-          </div>
-        ))}
       </div>
+
+
+      {/* ──────── RIGHT SIDE: HISTORY ──────── */}
+      <div className="hide-scrollbar" style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+          <h2 style={{ fontSize: "1.8rem", margin: 0, color: "#fff" }}>Recent History</h2>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(0, 214, 117, 0.1)", padding: "6px 12px", borderRadius: "20px" }}>
+            <div style={{ width: "8px", height: "8px", background: "#00D675", borderRadius: "50%" }}></div>
+            <span style={{ color: "#00D675", fontWeight: "700", fontSize: "0.9rem" }}>{prescriptions.length} Active Prescriptions</span>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+          {prescriptions.map((p) => (
+            <div key={p.id} style={{
+              background: "rgba(20, 20, 20, 0.6)",
+              backdropFilter: "blur(10px)",
+              borderRadius: "16px",
+              padding: "20px",
+              border: "1px solid rgba(255, 255, 255, 0.05)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px"
+            }}>
+
+              {/* Row 1: Name + Actions */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ margin: 0, fontSize: "1.2rem", color: "#fff" }}>{p.patientName}</h3>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <Edit3 size={18} color="#aaa" style={{ cursor: "pointer" }} onClick={() => handleEdit(p)} />
+                  <Trash2 size={18} color="#ff5252" style={{ cursor: "pointer" }} onClick={() => handleDelete(p.id)} />
+                </div>
+              </div>
+
+              {/* Row 2: Email + Date */}
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem", color: "#888" }}>
+                <span>{p.patientEmail}</span>
+                <span>{formatDate(p.createdAt)}</span>
+              </div>
+
+              {/* Row 3: Pres Data */}
+              <div style={{ background: "rgba(255,255,255,0.02)", padding: "10px", borderRadius: "8px" }}>
+                {p.medicines.map((m, idx) => (
+                  <span key={idx} style={{ display: "inline-block", marginRight: "10px", fontSize: "0.85rem", color: "#ddd" }}>
+                    {m.name} ({m.dosage})
+                  </span>
+                ))}
+              </div>
+
+              {/* Row 4: Status */}
+              <div style={{ alignSelf: "flex-start" }}>
+                <span style={{
+                  fontSize: "0.75rem",
+                  fontWeight: "700",
+                  textTransform: "uppercase",
+                  color: (p.status || "pending").toLowerCase() === "pending" ? "#ffa500" : "#00D675",
+                  background: (p.status || "pending").toLowerCase() === "pending" ? "rgba(255, 165, 0, 0.1)" : "rgba(0, 214, 117, 0.1)",
+                  padding: "4px 10px",
+                  borderRadius: "12px"
+                }}>
+                  {p.status || "Pending"}
+                </span>
+              </div>
+
+            </div>
+          ))}
+        </div>
+
+      </div>
+
     </div>
   );
 }
+
+const inputStyle = {
+  width: "100%",
+  background: "rgba(0,0,0,0.3)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  padding: "12px",
+  borderRadius: "8px",
+  color: "white",
+  outline: "none",
+  fontSize: "0.9rem"
+};
+
+const saveBtnStyle = {
+  width: "100%",
+  padding: "14px",
+  background: "#00D675",
+  color: "#000",
+  border: "none",
+  borderRadius: "10px",
+  fontWeight: "700",
+  fontSize: "1rem",
+  cursor: "pointer",
+  marginTop: "20px"
+};

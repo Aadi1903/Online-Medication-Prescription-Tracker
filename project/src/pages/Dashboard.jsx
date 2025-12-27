@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "../firebase";
-import { doc, getDoc, updateDoc  } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
 
@@ -19,7 +19,7 @@ import PatientReminders from "./PatientReminders";
 
 import BottomNav from "../components/BottomNav";
 
-export default function Dashboard({ user }) {
+export default function Dashboard({ user, showToast }) {
   const [role, setRole] = useState(null);
   const [page, setPage] = useState("dashboard");
   const [loading, setLoading] = useState(true);
@@ -59,14 +59,14 @@ export default function Dashboard({ user }) {
       {/*             DASHBOARD SCREEN            */}
       {/* --------------------------------------- */}
       {page === "dashboard" && role === "doctor" && <DoctorDashboard />}
-      {page === "dashboard" && role === "patient" && <PatientDashboard />}
+      {page === "dashboard" && role === "patient" && <PatientDashboard setPage={setPage} />}
       {page === "dashboard" && role === "pharmacist" && <PharmacistDashboard />}
       {page === "dashboard" && role === "admin" && <AdminDashboard />}
 
       {/* --------------------------------------- */}
       {/*             PRESCRIPTIONS               */}
       {/* --------------------------------------- */}
-      {page === "prescriptions" && role === "doctor" && <DoctorPrescriptions />}
+      {page === "prescriptions" && role === "doctor" && <DoctorPrescriptions showToast={showToast} />}
       {page === "prescriptions" && role === "patient" && <PatientPrescriptions />}
       {page === "prescriptions" && role === "pharmacist" && <div>Pharmacy Prescription Panel</div>}
       {page === "prescriptions" && role === "admin" && <AdminPrescriptions />}
@@ -75,7 +75,7 @@ export default function Dashboard({ user }) {
       {/*               REMINDERS                 */}
       {/* --------------------------------------- */}
       {page === "reminders" && role === "doctor" && <DoctorReminders />}
-      {page === "reminders" && role === "patient" && <PatientReminders />}
+      {page === "reminders" && role === "patient" && <PatientReminders showToast={showToast} />}
       {page === "reminders" && role === "pharmacist" && <div>No reminders for Pharmacist</div>}
       {page === "reminders" && role === "admin" && <div>No reminders for Admin</div>}
 
@@ -83,12 +83,12 @@ export default function Dashboard({ user }) {
       {/*                 PROFILE                 */}
       {/* --------------------------------------- */}
       {page === "profile" && (
-  // <ProfileSection role={role} user={user} />
-  <div style={{ width: "40vw", minHeight: "50vh" }}>
-  <ProfileSection role={role} user={user} />
-</div>
+        // <ProfileSection role={role} user={user} />
+        <div style={{ width: "40vw", minHeight: "50vh" }}>
+          <ProfileSection role={role} user={user} />
+        </div>
 
-)}
+      )}
 
 
 
