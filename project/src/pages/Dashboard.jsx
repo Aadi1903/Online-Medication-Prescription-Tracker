@@ -14,8 +14,12 @@ import PatientPrescriptions from "./PatientPrescriptions";
 import AdminPrescriptions from "./AdminPrescriptions";
 
 
+import PharmacistPrescriptions from "./PharmacistPrescriptions";
+import PharmacistReminders from "./PharmacistReminders";
+
 import DoctorReminders from "./DoctorReminders";
 import PatientReminders from "./PatientReminders";
+import AdminReminders from "./AdminReminders";
 
 import BottomNav from "../components/BottomNav";
 
@@ -60,7 +64,7 @@ export default function Dashboard({ user, showToast }) {
       {/* --------------------------------------- */}
       {page === "dashboard" && role === "doctor" && <DoctorDashboard />}
       {page === "dashboard" && role === "patient" && <PatientDashboard setPage={setPage} />}
-      {page === "dashboard" && role === "pharmacist" && <PharmacistDashboard />}
+      {page === "dashboard" && role === "pharmacist" && <PharmacistDashboard showToast={showToast} />}
       {page === "dashboard" && role === "admin" && <AdminDashboard />}
 
       {/* --------------------------------------- */}
@@ -68,7 +72,7 @@ export default function Dashboard({ user, showToast }) {
       {/* --------------------------------------- */}
       {page === "prescriptions" && role === "doctor" && <DoctorPrescriptions showToast={showToast} />}
       {page === "prescriptions" && role === "patient" && <PatientPrescriptions />}
-      {page === "prescriptions" && role === "pharmacist" && <div>Pharmacy Prescription Panel</div>}
+      {page === "prescriptions" && role === "pharmacist" && <PharmacistPrescriptions showToast={showToast} />}
       {page === "prescriptions" && role === "admin" && <AdminPrescriptions />}
 
       {/* --------------------------------------- */}
@@ -76,8 +80,8 @@ export default function Dashboard({ user, showToast }) {
       {/* --------------------------------------- */}
       {page === "reminders" && role === "doctor" && <DoctorReminders />}
       {page === "reminders" && role === "patient" && <PatientReminders showToast={showToast} />}
-      {page === "reminders" && role === "pharmacist" && <div>No reminders for Pharmacist</div>}
-      {page === "reminders" && role === "admin" && <div>No reminders for Admin</div>}
+      {page === "reminders" && role === "pharmacist" && <PharmacistReminders showToast={showToast} />}
+      {page === "reminders" && role === "admin" && <AdminReminders />}
 
       {/* --------------------------------------- */}
       {/*                 PROFILE                 */}

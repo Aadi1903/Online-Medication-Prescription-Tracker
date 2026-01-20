@@ -26,6 +26,7 @@ export default function DoctorReminders() {
         setAdherence(0);
         setPatientStats([]);
         setTopMissed([]);
+        setAlerts([]);
         return;
       }
 
@@ -37,20 +38,27 @@ export default function DoctorReminders() {
       const patientMap = {};
       data.forEach((r) => {
         if (!patientMap[r.patientId]) {
-          patientMap[r.patientId] = { total: 0, taken: 0, name: r.patientName || "Unknown" };
+          patientMap[r.patientId] = { total: 0, taken: 0, name: r.patientName || "Unknown", email: r.patientEmail || "" };
         }
         patientMap[r.patientId].total += 1;
         if (r.taken) patientMap[r.patientId].taken += 1;
       });
 
-      const patientList = Object.keys(patientMap).map((id) => ({
-        patientId: id,
-        patientName: patientMap[id].name,
-        percent: Math.round((patientMap[id].taken / patientMap[id].total) * 100),
-        missed: patientMap[id].total - patientMap[id].taken,
-      }));
+      const threshold = 70;
+      const patientList = Object.keys(patientMap).map((id) => {
+        const percent = Math.round((patientMap[id].taken / patientMap[id].total) * 100);
+        return {
+          patientId: id,
+          patientName: patientMap[id].name,
+          patientEmail: patientMap[id].email,
+          percent: percent,
+          missed: patientMap[id].total - patientMap[id].taken,
+          isCritical: percent < threshold
+        };
+      });
 
       setPatientStats(patientList);
+      setAlerts(patientList.filter(p => p.isCritical));
 
       // MOST MISSED MEDICINES
       const medCount = {};
@@ -85,6 +93,8 @@ export default function DoctorReminders() {
     };
   }, []);
 
+  const [alerts, setAlerts] = useState([]);
+
   return (
     <div
       className="hide-scrollbar"
@@ -97,14 +107,52 @@ export default function DoctorReminders() {
         overflowY: "auto"
       }}
     >
-      <div style={{ marginBottom: 40, textAlign: "center" }}>
-        <h2 style={{ fontSize: "2.5rem", fontWeight: "700", color: "#fff", margin: 0 }}>
+      <div style={{ marginBottom: 20, textAlign: "center" }}>
+        <h2 style={{ paddingTop: "1px" }}>
           Reminder Analytics
         </h2>
         <p style={{ color: "#9aa19a", marginTop: 10, fontSize: "1.1rem" }}>
           Monitor patient adherence and identify frequently missed medications.
         </p>
       </div>
+
+      {/* Alerts Section */}
+      {alerts.length > 0 && (
+        <div style={{
+          background: "rgba(255, 82, 82, 0.1)",
+          border: "1px solid rgba(255, 82, 82, 0.2)",
+          borderRadius: "20px",
+          padding: "25px",
+          marginBottom: "40px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "15px"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "1.5rem" }}>⚠️</span>
+            <h3 style={{ margin: 0, color: "#ff5252", fontSize: "1.3rem" }}>Critical Adherence Alerts ({alerts.length})</h3>
+          </div>
+          <p style={{ margin: 0, opacity: 0.8, fontSize: "0.95rem" }}>
+            The following patients have fallen below the 70% adherence threshold and may require immediate attention.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+            {alerts.map(a => (
+              <div key={a.patientId} style={{
+                background: "rgba(255, 82, 82, 0.15)",
+                padding: "8px 16px",
+                borderRadius: "30px",
+                border: "1px solid rgba(255, 82, 82, 0.3)",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px"
+              }}>
+                <span style={{ fontWeight: "700" }}>{a.patientName}</span>
+                <span style={{ color: "#ff5252", fontWeight: "800" }}>{a.percent}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Overall adherence card */}
       <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginBottom: 40 }}>
@@ -138,7 +186,20 @@ export default function DoctorReminders() {
                 <tbody>
                   {patientStats.map((p, idx) => (
                     <tr key={p.patientId || idx}>
-                      <td style={{ color: "#4facfe", fontWeight: "600" }}>{p.patientName}</td>
+                      <td style={{ color: "#4facfe", fontWeight: "600" }}>
+                        {p.patientName}
+                        {p.isCritical && (
+                          <span style={{
+                            marginLeft: "10px",
+                            fontSize: "0.7rem",
+                            background: "#ff5252",
+                            color: "#fff",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            textTransform: "uppercase"
+                          }}>Low</span>
+                        )}
+                      </td>
                       <td style={{ textAlign: "center" }}>
                         <span style={{
                           padding: "4px 10px",

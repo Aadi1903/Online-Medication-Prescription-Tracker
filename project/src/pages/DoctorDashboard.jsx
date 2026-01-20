@@ -51,20 +51,20 @@ export default function DoctorDashboard() {
     <div className="doctor-dashboard">
 
       {/* ─────────── DASHBOARD HEADER ─────────── */}
-<div className="dashboard-header">
+      <div className="dashboard-header">
 
-  {/* TITLE IN CENTER */}
-  <h1 className="dashboard-title">
-    Online Medication & Prescription Tracker
-  </h1>
+        {/* TITLE IN CENTER */}
+        <h1 className="dashboard-title" style={{ paddingTop: "40px" }}>
+          Online Medication & Prescription Tracker
+        </h1>
 
-  {/* DOCTOR PROFILE BELOW (LEFT ALIGNED) */}
-  <div className="dashboard-profile">
-    <User size={30} color="#00D675" />
-    <span className="profile-name">Dr. {doctor?.fullName || "Doctor"}</span>
-  </div>
+        {/* DOCTOR PROFILE BELOW (LEFT ALIGNED) */}
+        <div className="dashboard-profile">
+          <User size={30} color="#00D675" />
+          <span className="profile-name">Dr. {doctor?.fullName || "Doctor"}</span>
+        </div>
 
-</div>
+      </div>
 
 
       {/* ─────────── STAT CARDS ─────────── */}
@@ -92,7 +92,7 @@ export default function DoctorDashboard() {
         <h2>Pending Prescriptions</h2>
 
         {prescriptions.filter((p) => p.status === "pending").length === 0 ? (
-          <p className="empty-note">No pending prescriptions 🎉</p>
+          <p className="empty-note">No pending prescriptions</p>
         ) : (
           <div className="table-wrap">
             <table className="pres-table">
