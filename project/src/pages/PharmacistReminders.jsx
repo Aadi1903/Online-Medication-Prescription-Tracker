@@ -86,9 +86,7 @@ export default function PharmacistReminders({ showToast }) {
                 <h1 style={{ fontSize: "2rem", fontWeight: "bold", marginBottom: "8px" }}>
                     Stock Alerts & Overview
                 </h1>
-                <p style={{ color: "#888", fontSize: "1rem" }}>
-                    Real-time stock alerts and full inventory status.
-                </p>
+                
             </div>
 
             <div style={{ display: "grid", gap: "40px" }}>

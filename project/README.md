@@ -1,16 +1,53 @@
-# React + Vite
+# Online Medication Prescription Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A comprehensive web application designed to streamline the process of medication prescription and tracking. Built with React and Firebase, it provides dedicated interfaces for Doctors, Patients, Pharmacists, and Administrators to interact securely and efficiently.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Role-Based Access Control**
+  - **Admin**: Oversee the entire system, manage users, and view system-wide prescriptions and reminders.
+  - **Doctor**: Create and manage prescriptions, view patient history, and set medication reminders.
+  - **Patient**: Access personal prescriptions, track medication schedules, and receive reminders.
+  - **Pharmacist**: View and verify prescriptions to dispense medications accurately.
+  
+- **Secure Authentication**: Powered by Firebase Authentication, including Google Sign-In and standard Email/Password login.
+- **Real-Time Database**: Uses Firebase Firestore to store and sync user profiles, prescriptions, and reminders instantly.
+- **Responsive UI**: A modern, dark-themed user interface built with custom CSS, ensuring a smooth experience across devices.
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend**: React 18, Vite
+- **Charting**: Recharts
+- **Backend/BaaS**: Firebase (Authentication, Firestore, Storage)
+- **Styling**: Vanilla CSS
 
-## Expanding the ESLint configuration
+## Setup Instructions
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. **Clone the repository** (if applicable) or download the source code.
+2. **Navigate to the project directory**:
+   ```bash
+   cd project
+   ```
+3. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+4. **Configure Firebase**:
+   - The application relies on Firebase. Ensure `src/firebase.js` is correctly configured with your Firebase project credentials. (The project currently comes with default keys).
+
+5. **Start the Development Server**:
+   ```bash
+   npm run dev
+   ```
+6. **Access the application**: Open `http://localhost:5173` in your browser.
+
+## Project Structure
+
+- `src/pages/`: Contains the main route components, including authentication and the role-specific Dashboards (Admin, Doctor, Patient, Pharmacist).
+- `src/components/`: Reusable UI components like `Toast`, `BottomNav`, and `GoogleSignInButton`.
+- `src/firebase.js`: Firebase configuration and initialization.
+- `src/App.jsx`: Main application wrapper handling authentication state and global Toast notifications.
+
+## Documentation
+
+For more detailed technical documentation, please refer to the `docs/` directory.
